@@ -1,0 +1,370 @@
+
+
+
+Count Down Timer with Alarm and Watercolor Clock
+------------------------------------------------
+
+This HTML file is a digital clock and countdown timer with a beautiful animated watercolor background. It is designed to be easy to use and visually appealing for all viewers.
+
+Features:
+---------
+- Large digital clock display with AM/PM indicator.
+- Animated watercolor background for a relaxing visual effect.
+- Countdown timer with input fields for days, hours, and minutes.
+- When the countdown reaches zero, a beeper alarm sounds for 30 seconds.
+- Responsive design: works on any screen size.
+
+How to Use:
+-----------
+1. Open the HTML file in any modern web browser (Chrome, Edge, Firefox, etc.).
+2. The clock will display the current time in the center of the screen.
+3. To set a countdown, use the input bar near the middle of the screen:
+   - Enter the number of days, hours, and minutes you want to count down from.
+   - Click the "Start Countdown" button.
+4. The countdown timer will display below the clock, showing days, hours, minutes, and seconds remaining.
+5. When the countdown reaches zero, a beeping alarm will sound for 30 seconds.
+   - You can set a new countdown at any time by entering new values and clicking "Start Countdown" again.
+
+Tips:
+-----
+- The timer and alarm work best if your browser tab is active and your device's sound is enabled.
+- The animated background is generated live and will adapt to your screen size.
+- No installation is required; just open the file and use!
+
+Enjoy your new digital clock and countdown timer!
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Watercolor Screen Saver with Clock & Countdown</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: black;
+        }
+        canvas {
+            display: block;
+        }
+        .digital-clock {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 12vw;
+            color: rgba(255, 255, 255, 0.8);
+            font-family: 'Courier New', Courier, monospace;
+            line-height: 1.2;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+        .ampm {
+            font-size: 5vw;
+            vertical-align: top;
+            margin-left: 1vw;
+        }
+        .countdown {
+            font-size: 5vw;
+            color: #fffa;
+            margin-top: 2vw;
+            letter-spacing: 0.1em;
+        }
+        .label {
+            font-size: 2vw;
+            color: #fff8;
+            margin-top: 0.5vw;
+        }
+        .controls {
+            position: absolute;
+            /* Move up 2 more lines from previous 61% to 57% */
+            top: 57%;
+            left: 50%;
+            transform: translate(-50%, 0);
+            background: rgba(0,0,0,0.5);
+            padding: 1vw 2vw;
+            border-radius: 1vw;
+            color: #fff;
+            font-size: 2vw;
+            z-index: 10;
+            display: flex;
+            gap: 1vw;
+            align-items: center;
+        }
+        .controls input[type="number"] {
+            width: 5vw;
+            font-size: 2vw;
+            padding: 0.2vw;
+            border-radius: 0.5vw;
+            border: none;
+        }
+        .controls button {
+            font-size: 2vw;
+            padding: 0.2vw 1vw;
+            border-radius: 0.5vw;
+            border: none;
+            background: #444;
+            color: #fff;
+            cursor: pointer;
+        }
+        .controls button:hover {
+            background: #666;
+        }
+        .controls label {
+            font-size: 2vw;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="watercolorCanvas"></canvas>
+    <div class="controls">
+        <label for="countdownDays">Days:</label>
+        <input type="number" id="countdownDays" min="0" max="999" value="0">
+        <label for="countdownHours">Hours:</label>
+        <input type="number" id="countdownHours" min="0" max="23" value="1">
+        <label for="countdownMinutes">Minutes:</label>
+        <input type="number" id="countdownMinutes" min="0" max="59" value="0">
+        <button id="startCountdown">Start Countdown</button>
+    </div>
+    <div class="digital-clock" id="digitalClock"></div>
+    <script>
+        const canvas = document.getElementById('watercolorCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        let time = 0;
+        const points = [];
+        let gradientColors = [];
+
+        // Countdown logic
+        let countdownActive = false;
+        let countdownTarget = null;
+        const defaultCountdownDays = 0;
+        const defaultCountdownHours = 1;
+        const defaultCountdownMinutes = 0;
+
+        // Alarm logic
+        let alarmActive = false;
+        let alarmStartTime = null;
+        let alarmInterval = null;
+
+        function randomColor() {
+            const r = Math.floor(Math.random() * 256);
+            const g = Math.floor(Math.random() * 256);
+            const b = Math.floor(Math.random() * 256);
+            return `rgb(${r},${g},${b})`;
+        }
+
+        function createRandomPoints(numPoints) {
+            for (let i = 0; i < numPoints; i++) {
+                points.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    vx: (Math.random() - 0.5) * 2,
+                    vy: (Math.random() - 0.5) * 2,
+                    color: randomColor(),
+                    targetColor: randomColor(),
+                    changeTime: Math.random() * 100,
+                    size: Math.random() * 10 + 5
+                });
+            }
+        }
+
+        function lerpColor(a, b, amount) {
+            const [ar, ag, ab] = a.match(/\d+/g).map(Number);
+            const [br, bg, bb] = b.match(/\d+/g).map(Number);
+            const rr = ar + amount * (br - ar);
+            const rg = ag + amount * (bg - ag);
+            const rb = ab + amount * (bb - ab);
+            return `rgb(${Math.round(rr)},${Math.round(rg)},${Math.round(rb)})`;
+        }
+
+        function updateGradientColors() {
+            gradientColors = [];
+            for (let i = 0; i <= 1; i += 0.2) {
+                gradientColors.push(`hsl(${(Math.random() * 360)}, 100%, 50%)`);
+            }
+            setTimeout(updateGradientColors, Math.random() * 5000 + 5000);
+        }
+
+        function drawWatercolor() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const gradient = ctx.createRadialGradient(
+                canvas.width / 2, canvas.height / 2, 0,
+                canvas.width / 2, canvas.height / 2, Math.max(canvas.width, canvas.height)
+            );
+
+            gradientColors.forEach((color, index) => {
+                gradient.addColorStop(index / (gradientColors.length - 1), color);
+            });
+
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            points.forEach(point => {
+                if (time > point.changeTime) {
+                    point.targetColor = randomColor();
+                    point.changeTime = time + Math.random() * 100;
+                }
+                point.color = lerpColor(point.color, point.targetColor, 0.01);
+
+                point.x += point.vx;
+                point.y += point.vy;
+
+                if (point.x < 0 || point.x > canvas.width) point.vx *= -1;
+                if (point.y < 0 || point.y > canvas.height) point.vy *= -1;
+
+                ctx.fillStyle = point.color;
+                ctx.beginPath();
+                ctx.arc(point.x, point.y, point.size, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            ctx.globalAlpha = 0.05;
+            ctx.drawImage(canvas, Math.sin(time) * 5, Math.cos(time) * 5);
+            ctx.globalAlpha = 1.0;
+
+            time += 0.01;
+            requestAnimationFrame(drawWatercolor);
+        }
+
+        function formatCountdown(ms) {
+            if (ms <= 0) return "00:00:00:00:00";
+            const days = Math.floor(ms / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((ms / (1000 * 60 * 60)) % 24);
+            const minutes = Math.floor((ms / (1000 * 60)) % 60);
+            const seconds = Math.floor((ms / 1000) % 60);
+            return `${String(days).padStart(2, '0')}:${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        }
+
+        // Beep sound using Web Audio API
+        function playBeep() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = ctx.createOscillator();
+                const gain = ctx.createGain();
+                oscillator.type = 'sine';
+                oscillator.frequency.value = 1000;
+                gain.gain.value = 0.2;
+                oscillator.connect(gain);
+                gain.connect(ctx.destination);
+                oscillator.start();
+                setTimeout(() => {
+                    oscillator.stop();
+                    ctx.close();
+                }, 200); // 0.2 second beep
+            } catch (e) {
+                alert("Beep!");
+            }
+        }
+
+        function startAlarm() {
+            if (alarmActive) return;
+            alarmActive = true;
+            alarmStartTime = Date.now();
+            let beepCount = 0;
+            alarmInterval = setInterval(() => {
+                if (beepCount < 60) {
+                    playBeep();
+                    beepCount++;
+                } else {
+                    clearInterval(alarmInterval);
+                    alarmActive = false;
+                }
+            }, 500);
+        }
+
+        function stopAlarm() {
+            if (alarmInterval) {
+                clearInterval(alarmInterval);
+                alarmInterval = null;
+            }
+            alarmActive = false;
+        }
+
+        function drawClockAndCountdown() {
+            const now = new Date();
+            let hours = now.getHours();
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12;
+            hours = hours ? hours : 12;
+            hours = String(hours).padStart(2, '0');
+
+            let countdownStr = '';
+            let diff = 0;
+            if (countdownActive && countdownTarget) {
+                diff = countdownTarget - now;
+                countdownStr = formatCountdown(diff);
+                if (diff <= 0 && !alarmActive) {
+                    startAlarm();
+                }
+                if (diff > 0 && alarmActive) {
+                    stopAlarm();
+                }
+            } else {
+                // Show default countdown
+                const ms = (defaultCountdownDays * 24 * 60 * 60 * 1000) +
+                           (defaultCountdownHours * 60 * 60 * 1000) +
+                           (defaultCountdownMinutes * 60 * 1000);
+                countdownStr = formatCountdown(ms);
+                stopAlarm();
+            }
+
+            const clockElement = document.getElementById('digitalClock');
+            clockElement.innerHTML = `
+                <span>${hours}:${minutes}:${seconds} <span class="ampm">${ampm}</span></span>
+                <div class="countdown">${countdownStr}</div>
+                <div class="label">Countdown (DD:HH:MM:SS)</div>
+            `;
+        }
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            points.length = 0;
+            createRandomPoints(200);
+        }
+
+        // Controls logic
+        document.getElementById('startCountdown').onclick = function() {
+            const daysInput = document.getElementById('countdownDays');
+            const hoursInput = document.getElementById('countdownHours');
+            const minutesInput = document.getElementById('countdownMinutes');
+            let days = parseInt(daysInput.value, 10);
+            let hours = parseInt(hoursInput.value, 10);
+            let minutes = parseInt(minutesInput.value, 10);
+            if (isNaN(days) || days < 0) days = defaultCountdownDays;
+            if (isNaN(hours) || hours < 0) hours = defaultCountdownHours;
+            if (isNaN(minutes) || minutes < 0) minutes = defaultCountdownMinutes;
+            const ms = (days * 24 * 60 * 60 * 1000) +
+                       (hours * 60 * 60 * 1000) +
+                       (minutes * 60 * 1000);
+            countdownTarget = new Date(Date.now() + ms);
+            countdownActive = true;
+            stopAlarm();
+        };
+
+        window.addEventListener('resize', resizeCanvas);
+
+        resizeCanvas();
+        updateGradientColors();
+        drawWatercolor();
+        setInterval(drawClockAndCountdown, 1000);
+    </script>
+</body>
+</html>
+
+
+
+
+
+
+
